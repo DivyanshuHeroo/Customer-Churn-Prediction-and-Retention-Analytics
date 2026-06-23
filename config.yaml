@@ -1,0 +1,76 @@
+# ============================================================================
+# Central configuration for the Customer Churn Prediction & Retention project.
+# Every script reads from this file so behaviour is reproducible and tunable
+# from a single place (no magic numbers buried in code).
+# ============================================================================
+
+project:
+  name: "Customer Churn Prediction & Retention Analytics"
+  random_seed: 42
+
+paths:
+  raw_data: "data/raw/telco_churn.csv"
+  processed_data: "data/processed/telco_processed.csv"
+  models_dir: "models"
+  figures_dir: "reports/figures"
+  reports_dir: "reports"
+
+data:
+  # Public mirror of the IBM Telco Customer Churn dataset.
+  download_url: "https://raw.githubusercontent.com/IBM/telco-customer-churn-on-icp4d/master/data/Telco-Customer-Churn.csv"
+  target_column: "Churn"
+  id_column: "customerID"
+  # If the download fails (e.g. no internet), generate a high-fidelity
+  # synthetic dataset with the same schema and realistic relationships.
+  synthetic_n_customers: 7043
+
+split:
+  test_size: 0.20
+  validation_size: 0.20
+  stratify: true
+
+model:
+  # Models entered into the bake-off. Best is chosen by validation PR-AUC.
+  candidates: ["logistic_regression", "random_forest", "xgboost"]
+  cv_folds: 5
+  scoring: "average_precision"   # PR-AUC: the honest metric for imbalance
+  use_smote: true                # compare class-weights vs SMOTE oversampling
+
+# ----------------------------------------------------------------------------
+# Business economics — the heart of the cost-sensitive optimisation.
+# These numbers turn an ML model into a profit-maximising decision system.
+# ----------------------------------------------------------------------------
+business:
+  # Average monthly margin retained when we successfully keep a customer.
+  avg_monthly_margin: 50.0
+  # Expected remaining lifetime (months) of a saved customer.
+  expected_lifetime_months: 24
+  # Cost of a retention offer/intervention per targeted customer.
+  retention_offer_cost: 60.0
+  # Probability that a retention offer actually works on a churner.
+  offer_success_rate: 0.30
+  # Annual discount rate used for CLV present-value calculation.
+  annual_discount_rate: 0.10
+
+# ----------------------------------------------------------------------------
+# Tiered intervention policy.
+# Instead of a single yes/no decision, we choose among THREE actions per
+# customer and assign each to a risk band. Boundaries are derived from these
+# economics (we pick the action with the highest expected value), so the bands
+# are justified by math rather than guessed.
+#   - do_nothing : no cost, no effect (customer keeps their natural outcome)
+#   - discount   : cheap, lower save-rate (mass-market, scalable)
+#   - call       : expensive human outreach, higher save-rate (reserved for the
+#                  highest-risk customers where it is worth it)
+# ----------------------------------------------------------------------------
+interventions:
+  discount:
+    cost: 30.0            # cost of the discount offer per customer
+    success_rate: 0.25    # P(retain a true churner | discount)
+  call:
+    cost: 100.0           # cost of a personal retention call per customer
+    success_rate: 0.45    # P(retain a true churner | call)
+
+segmentation:
+  n_clusters: 4
+
